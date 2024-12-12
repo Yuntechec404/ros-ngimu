@@ -6,16 +6,18 @@
 #include <sensor_msgs/Temperature.h>
 #include <sensor_msgs/MagneticField.h>
 #include "NgimuReceive.h"
+#include <tf/transform_broadcaster.h>
 #include <fcntl.h> // Contains file controls like O_RDWR
 #include <errno.h> // Error integer and strerror() function
 #include <termios.h> // Contains POSIX terminal control definitions
 #include <unistd.h> // write(), read(), close()
 #include <cstdlib>
-#include <iostream>
+#include <string>
 #include <thread>
-// C library headers
-#include <stdio.h>
-#include <string.h>
+
+bool _publish_tf;
+std::string _base_footprint_frame = "base_footprint";
+std::string _imu_frame = "imu_link";
 
 ros::Publisher imuPub;
 ros::Publisher imu_low_pass_Pub;
@@ -94,6 +96,23 @@ void ngimuSensorsCallback(const NgimuSensors ngimuSensors)
 
 void ngimuQuaternionCallback(const NgimuQuaternion ngimuQuaternion)
 {
+    
+    // Publish TF (_base_footprint_frame -> _imu_frame)
+    if (_publish_tf) {
+        static tf::TransformBroadcaster imu_broadcaster;
+        tf::Transform transform;
+        
+        transform.setOrigin( tf::Vector3(0.0, 0.0, 0.0) );
+        tf::Quaternion q;
+        q.setValue( -ngimuQuaternion.x,
+                    -ngimuQuaternion.y,
+                    -ngimuQuaternion.z,
+                    ngimuQuaternion.w);
+        transform.setRotation(q);
+        imu_broadcaster.sendTransform(tf::StampedTransform(transform, ros::Time::now(), _base_footprint_frame, _imu_frame));
+    }
+
+    // Publish IMU Topic
     // set time
     imuData.header.stamp = ros::Time::now();
 
@@ -208,8 +227,13 @@ void receiveImu()
 
 int main(int argc, char ** argv)
 {
-    ros::init( argc, argv, "ngimu");
-    ros::NodeHandle n;
+    ros::init(argc, argv, "ngimu");
+    ros::NodeHandle n, nh_private("~");
+
+    nh_private.param("publish_tf", _publish_tf, false);
+    nh_private.param("base_footprint_frame", _base_footprint_frame, std::string("base_footprint"));
+    nh_private.param("imu_frame", _imu_frame, std::string("imu_link"));
+
     imuPub = n.advertise<sensor_msgs::Imu>("/imu/data_raw", 400);
     magPub = n.advertise<sensor_msgs::MagneticField>("/imu/mag", 400);
     imu_low_pass_Pub = n.advertise<sensor_msgs::Imu>("/imu/low_pass", 400);

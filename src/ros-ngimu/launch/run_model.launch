@@ -1,0 +1,15 @@
+<launch>
+
+  <!-- x-io NGIMU (include TF) -->
+  <param name="robot_description" textfile="$(find ros-ngimu)/urdf/ngimu_housing_solid.urdf"/>
+  <node name="ng_imu" pkg="ros-ngimu" type="ngimu_node" respawn="true" output="screen">
+    <param name="publish_tf" value="true"/>
+    <param name="base_footprint_frame" value="base_footprint"/>
+    <param name="imu_frame" value="imu_link"/>
+  </node>
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="true"/>
+  
+  <!-- RViz Visualization -->
+  <node pkg="rviz" type="rviz" name="ngimu_rviz" args="-d $(find ros-ngimu)/rviz/model.rviz" />
+
+</launch>
